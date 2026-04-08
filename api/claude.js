@@ -7,12 +7,18 @@ export default async function handler(req, res) {
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'Clé Anthropic manquante' });
   try {
+    const body = { ...req.body, model: 'claude-opus-4-5' };
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify(req.body)
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(body)
     });
-    return res.status(response.status).json(await response.json());
+    const data = await response.json();
+    return res.status(response.status).json(data);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
