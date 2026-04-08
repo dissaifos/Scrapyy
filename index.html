@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrapy — Prospection Google Maps × Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080808;--bg2:#111;--bg3:#1a1a1a;--bg4:#222;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#ededed;--muted:#777;--muted2:#444;
+  --accent:#c8ff00;--accent-dim:rgba(200,255,0,0.1);
+  --red:#ff5555;--orange:#ff9f43;--blue:#5b8dee;
+  --head:'Syne',sans-serif;--body:'DM Sans',sans-serif;
+  --radius:8px;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:rgba(8,8,8,0.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.nav-logo{font-family:var(--head);font-size:15px;font-weight:800;letter-spacing:0.15em;color:var(--text)}
+.nav-logo span{color:var(--accent)}
+.nav-tag{font-size:10px;letter-spacing:0.15em;color:var(--accent);border:1px solid rgba(200,255,0,0.3);padding:3px 10px;border-radius:2px;text-transform:uppercase}
+
+/* HERO */
+.hero{padding:64px 32px 48px;max-width:1100px;margin:0 auto}
+.hero-eyebrow{font-size:11px;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.hero-eyebrow::before{content:'';width:24px;height:1px;background:var(--accent)}
+.hero h1{font-family:var(--head);font-size:clamp(32px,5vw,60px);font-weight:800;line-height:1.05;letter-spacing:-0.025em;margin-bottom:16px}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero-sub{font-size:15px;color:var(--muted);max-width:480px;font-weight:300;line-height:1.7}
+
+/* MAIN GRID */
+.main-grid{display:grid;grid-template-columns:340px 1fr;gap:24px;max-width:1100px;margin:0 auto;padding:0 32px 60px}
+
+/* PANEL */
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.panel-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted)}
+.panel-body{padding:18px}
+
+/* FORM */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input,.field select{width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--body);font-size:13px;outline:none;transition:border-color 0.2s}
+.field input:focus,.field select:focus{border-color:rgba(200,255,0,0.4)}
+.field input::placeholder{color:var(--muted2)}
+select option{background:var(--bg3)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* MODE TOGGLE */
+.mode-box{margin-bottom:16px;padding:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius)}
+.mode-row{display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.mode-label{font-size:12px;font-weight:500;color:var(--text)}
+.mode-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.toggle-switch{width:34px;height:18px;background:var(--bg4);border-radius:9px;position:relative;cursor:pointer;transition:background 0.2s;border:1px solid var(--border2);flex-shrink:0}
+.toggle-switch.on{background:var(--accent)}
+.toggle-knob{position:absolute;top:2px;left:2px;width:12px;height:12px;background:#fff;border-radius:50%;transition:left 0.2s}
+.toggle-switch.on .toggle-knob{left:18px}
+.apify-note{margin-top:10px;font-size:11px;color:var(--muted);padding:8px 10px;background:var(--bg4);border-radius:4px;line-height:1.5;display:none}
+.apify-note.visible{display:block}
+.apify-note a{color:var(--accent);text-decoration:none}
+
+/* RUN BUTTON */
+.btn-run{width:100%;padding:12px;background:var(--accent);color:#000;font-family:var(--head);font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;border:none;border-radius:var(--radius);cursor:pointer;transition:opacity 0.2s,transform 0.1s;margin-top:4px}
+.btn-run:hover{opacity:0.85}
+.btn-run:active{transform:scale(0.99)}
+.btn-run:disabled{opacity:0.35;cursor:not-allowed}
+
+.divider{height:1px;background:var(--border);margin:14px 0}
+.stack-info{font-size:10px;color:var(--muted2);text-align:center;margin-top:10px}
+
+/* RESULTS */
+.results-panel{display:flex;flex-direction:column;gap:16px}
+
+.empty-state{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:56px 32px;text-align:center}
+.empty-icon{font-size:36px;margin-bottom:14px;opacity:0.35}
+.empty-title{font-family:var(--head);font-size:17px;font-weight:700;color:var(--muted);margin-bottom:8px}
+.empty-sub{font-size:12px;color:var(--muted2);max-width:260px;margin:0 auto;line-height:1.6}
+
+/* LOADING */
+.loading-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px}
+.loading-steps{display:flex;flex-direction:column;gap:11px;margin-bottom:20px}
+.step-item{display:flex;align-items:center;gap:11px;font-size:12px;color:var(--muted);transition:color 0.3s}
+.step-item.active{color:var(--text)}
+.step-item.done{color:var(--accent)}
+.step-dot{width:7px;height:7px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:background 0.3s}
+.step-item.active .step-dot{background:var(--accent);box-shadow:0 0 7px rgba(200,255,0,0.6)}
+.step-item.done .step-dot{background:var(--accent)}
+.progress-bar-wrap{height:2px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.progress-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.5s ease}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px}
+.stat-val{font-family:var(--head);font-size:24px;font-weight:800;line-height:1}
+.stat-val.green{color:var(--accent)}
+.stat-val.orange{color:var(--orange)}
+.stat-val.red{color:var(--red)}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:4px}
+
+/* TABLE */
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-top{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.table-top-title{font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+.table-actions{display:flex;gap:8px}
+.btn-sm{padding:5px 11px;font-size:11px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;border-radius:4px;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--text);transition:all 0.2s;font-family:var(--body)}
+.btn-sm:hover{border-color:rgba(200,255,0,0.4);color:var(--accent)}
+.btn-sm.primary{background:var(--accent);color:#000;border-color:var(--accent)}
+.btn-sm.primary:hover{opacity:0.85}
+
+.filter-row{padding:9px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
+.filter-btn{padding:3px 11px;font-size:10px;font-weight:500;border-radius:20px;border:1px solid var(--border2);background:none;color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:var(--body)}
+.filter-btn.all.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.filter-btn.fa{border-color:rgba(107,196,107,0.35);color:#6bc46b}
+.filter-btn.fa.active{background:rgba(107,196,107,0.1)}
+.filter-btn.fb{border-color:rgba(255,159,67,0.35);color:var(--orange)}
+.filter-btn.fb.active{background:rgba(255,159,67,0.1)}
+.filter-btn.fc{border-color:rgba(255,85,85,0.35);color:var(--red)}
+.filter-btn.fc.active{background:rgba(255,85,85,0.1)}
+
+table{width:100%;border-collapse:collapse}
+th{padding:9px 13px;text-align:left;font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted2);border-bottom:1px solid var(--border)}
+td{padding:11px 13px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.012)}
+
+.score-badge{display:inline-flex;width:22px;height:22px;border-radius:4px;font-size:11px;font-weight:700;align-items:center;justify-content:center;font-family:var(--head)}
+.score-a{background:rgba(107,196,107,0.15);color:#6bc46b;border:1px solid rgba(107,196,107,0.3)}
+.score-b{background:rgba(255,159,67,0.15);color:var(--orange);border:1px solid rgba(255,159,67,0.3)}
+.score-c{background:rgba(255,85,85,0.1);color:var(--red);border:1px solid rgba(255,85,85,0.2)}
+
+.biz-name{font-weight:500;color:var(--text);font-size:13px;margin-bottom:2px}
+.biz-addr{color:var(--muted);font-size:11px}
+.biz-tel{color:var(--muted2);font-size:10px;margin-top:1px}
+
+.signal-tag{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;background:var(--bg3);border:1px solid var(--border2);color:var(--muted);margin:1px 1px 1px 0}
+
+.angle-text{font-size:11px;color:var(--blue);font-style:italic;max-width:190px;line-height:1.4}
+
+.email-btn{padding:4px 8px;font-size:10px;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--muted);cursor:pointer;transition:all 0.15s;white-space:nowrap;font-family:var(--body)}
+.email-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:560px;max-height:82vh;overflow-y:auto}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg2);z-index:2}
+.modal-title{font-family:var(--head);font-size:13px;font-weight:700;letter-spacing:0.05em}
+.modal-close{width:26px;height:26px;border-radius:4px;border:1px solid var(--border2);background:none;color:var(--muted);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:20px}
+.modal-prospect{padding:11px 13px;background:var(--bg3);border-radius:6px;margin-bottom:14px;border:1px solid var(--border)}
+.modal-loading{text-align:center;padding:32px;color:var(--muted);font-size:13px}
+.modal-spinner{font-size:22px;display:block;margin-bottom:10px;animation:spin 1.5s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.email-result{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:16px;font-size:13px;line-height:1.75;color:var(--text);white-space:pre-wrap;font-family:var(--body)}
+.copy-email-btn{width:100%;margin-top:10px;padding:10px;border:1px solid rgba(200,255,0,0.3);border-radius:6px;background:var(--accent-dim);color:var(--accent);font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;font-family:var(--head)}
+.copy-email-btn:hover{background:var(--accent);color:#000}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
+
+@media(max-width:860px){
+  .main-grid{grid-template-columns:1fr;padding:0 16px 40px}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  nav,.hero{padding-left:16px;padding-right:16px}
+  .hero{padding-top:40px;padding-bottom:32px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">SCRA<span>PY</span></div>
+  <div class="nav-tag">Prospection IA</div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow">Google Maps × Claude</div>
+  <h1>Scrapy — <em>Intelligence</em><br>commerciale locale</h1>
+  <p class="hero-sub">Extrais, analyse et score des prospects depuis Google Maps. 200 fiches scorées A/B/C en 10 minutes.</p>
+</div>
+
+<div class="main-grid">
+
+  <!-- CONFIG -->
+  <div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Configuration</span></div>
+      <div class="panel-body">
+
+        <div class="mode-box">
+          <div class="mode-row" onclick="toggleApify()">
+            <div>
+              <div class="mode-label">Mode Apify (vraies données)</div>
+              <div class="mode-sub">Scraping réel Google Maps</div>
+            </div>
+            <div class="toggle-switch" id="apify-toggle"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="apify-note" id="apify-note">
+            La clé Apify est configurée côté serveur.<br>
+            Si tu vois une erreur, vérifie la variable <code>APIFY_API_KEY</code> dans <a href="https://vercel.com/dashboard" target="_blank">Vercel → Settings → Environment Variables</a>.
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Secteur d'activité</label>
+          <select id="sector">
+            <option value="restaurants">🍕 Restaurants & food</option>
+            <option value="salons de coiffure">💇 Salons de coiffure & beauté</option>
+            <option value="agences immobilieres">🏠 Agences immobilières</option>
+            <option value="garages reparation auto">🔧 Garages & réparation auto</option>
+            <option value="cabinets medicaux dentaires">🏥 Cabinets médicaux & dentaires</option>
+            <option value="avocats comptables">⚖️ Avocats & comptables</option>
+            <option value="salles de sport coaching">🏋️ Salles de sport & coaching</option>
+            <option value="commerces de proximite">🛒 Commerces de proximité</option>
+            <option value="hotels hebergements">🏨 Hôtels & hébergements</option>
+            <option value="ecoles centres de formation">🎓 Écoles & centres de formation</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Zone géographique</label>
+          <input type="text" id="zone" placeholder="ex: Lyon 3e, Paris 11e..." value="Lyon 3e">
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Nombre de fiches</label>
+            <select id="count">
+              <option value="10">10 fiches</option>
+              <option value="20" selected>20 fiches</option>
+              <option value="30">30 fiches</option>
+              <option value="50">50 fiches</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Note max</label>
+            <select id="max-rating">
+              <option value="5">Toutes les notes</option>
+              <option value="4.2" selected>≤ 4.2 étoiles</option>
+              <option value="3.8">≤ 3.8 étoiles</option>
+              <option value="3.5">≤ 3.5 étoiles</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <button class="btn-run" id="run-btn" onclick="runProspection()">↗ Lancer l'analyse</button>
+        <div class="stack-info" id="source-label">Mode actuel : Simulation Claude (sans Apify)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-panel" id="results-panel">
+    <div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">Aucune analyse lancée</div>
+      <div class="empty-sub">Configure tes critères à gauche et clique sur "Lancer l'analyse".</div>
+    </div>
+  </div>
+</div>
+
+<!-- EMAIL MODAL -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">✉ Email — <span id="modal-prospect-name"></span></span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-prospect-info" class="modal-prospect"></div>
+      <div id="modal-email-content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let apifyEnabled = false;
+let allProspects = [];
+let currentFilter = 'all';
+
+function toggleApify() {
+  apifyEnabled = !apifyEnabled;
+  document.getElementById('apify-toggle').classList.toggle('on', apifyEnabled);
+  document.getElementById('apify-note').classList.toggle('visible', apifyEnabled);
+  document.getElementById('source-label').textContent = apifyEnabled
+    ? 'Mode actuel : Apify + Claude (vraies données)'
+    : 'Mode actuel : Simulation Claude (sans Apify)';
+}
+
+async function callClaude(body) {
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur serveur ${res.status}`);
+  }
+  return res.json();
+}
+
+async function callApify(body) {
+  const res = await fetch('/api/apify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur Apify ${res.status}`);
+  }
+  return res.json();
+}
+
+async function runProspection() {
+  const sector = document.getElementById('sector').value;
+  const zone = document.getElementById('zone').value.trim() || 'Lyon';
+  const count = parseInt(document.getElementById('count').value);
+  const maxRating = parseFloat(document.getElementById('max-rating').value);
+
+  document.getElementById('run-btn').disabled = true;
+  showLoading(apifyEnabled);
+
+  try {
+    let prospects = [];
+    if (apifyEnabled) {
+      prospects = await runWithApify(sector, zone, count);
+    } else {
+      prospects = await runSimulation(sector, zone, count, maxRating);
+    }
+    if (!prospects || prospects.length === 0) throw new Error('Aucune fiche récupérée.');
+    allProspects = prospects;
+    renderResults(prospects, sector, zone);
+  } catch(e) {
+    showError(e.message);
+  }
+  document.getElementById('run-btn').disabled = false;
+}
+
+function showLoading(apify) {
+  const steps = apify ? [
+    '🗺️ Démarrage du scraper Google Maps...',
+    '📋 Extraction des fiches en cours...',
+    '⏳ Attente des résultats Apify...',
+    '🧠 Analyse et scoring Claude...',
+    '✅ Finalisation des prospects...'
+  ] : [
+    '🧠 Génération des fiches avec Claude...',
+    '📋 Simulation des données Google Maps...',
+    '🔍 Détection des signaux d\'achat...',
+    '🏆 Scoring A / B / C...',
+    '✅ Tri et finalisation...'
+  ];
+
+  document.getElementById('results-panel').innerHTML = `
+    <div class="loading-card">
+      <div class="loading-steps">
+        ${steps.map((s,i) => `<div class="step-item${i===0?' active':''}" id="lstep-${i}">
+          <div class="step-dot"></div><span>${s}</span>
+        </div>`).join('')}
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="prog" style="width:5%"></div>
+      </div>
+    </div>`;
+
+  let s = 0;
+  window._loadingIv = setInterval(() => {
+    if (s < steps.length - 1) {
+      document.getElementById(`lstep-${s}`)?.classList.replace('active','done');
+      s++;
+      document.getElementById(`lstep-${s}`)?.classList.add('active');
+      document.getElementById('prog').style.width = Math.round((s / steps.length) * 88) + '%';
+    }
+  }, apify ? 4000 : 700);
+}
+
+function stopLoading() {
+  clearInterval(window._loadingIv);
+  const p = document.getElementById('prog');
+  if (p) p.style.width = '100%';
+}
+
+async function runWithApify(sector, zone, count) {
+  // 1. Start run
+  const startData = await callApify({ action: 'start', sector, zone, count });
+  const runId = startData.data?.id;
+  if (!runId) throw new Error('Apify : impossible de démarrer le scraper.');
+
+  // 2. Poll status
+  for (let i = 0; i < 40; i++) {
+    await new Promise(r => setTimeout(r, 4000));
+    const statusData = await callApify({ action: 'status', runId });
+    const status = statusData.data?.status;
+    if (status === 'SUCCEEDED') break;
+    if (['FAILED','ABORTED','TIMED-OUT'].includes(status)) throw new Error(`Apify : le scraper a échoué (${status}).`);
+  }
+
+  // 3. Get results
+  const items = await callApify({ action: 'results', runId });
+  const raw = (Array.isArray(items) ? items : []).map(p => ({
+    nom: p.title || p.name,
+    adresse: p.address,
+    telephone: p.phone,
+    site: p.website || null,
+    note: p.totalScore,
+    avis: p.reviewsCount,
+    fiche_revendiquee: !!p.claimedStatus,
+  }));
+
+  return scoreRawData(raw);
+}
+
+async function scoreRawData(raw) {
+  const prompt = `Tu es un analyste commercial expert en prospection locale.
+
+Voici une liste de fiches Google Maps (JSON). Pour chaque fiche, ajoute un scoring commercial.
+
+Critères :
+- Score A (prioritaire) : 2+ signaux → <15 avis, note <3.8, site absent/vieux (<2019), fiche non revendiquée, concurrent fort
+- Score B : 1 signal présent
+- Score C : bien positionné digitalement
+
+Retourne UNIQUEMENT le même array JSON enrichi avec ces 3 champs sur chaque objet :
+"score": "A"|"B"|"C", "signaux": ["signal1","signal2"], "angle": "phrase courte pour email"
+
+Données : ${JSON.stringify(raw.slice(0, 50))}`;
+
+  const data = await callClaude({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] });
+  const text = data.content?.map(c => c.text || '').join('') || '';
+  try {
+    return JSON.parse(text.replace(/```json|```/g, '').trim());
+  } catch {
+    const m = text.match(/\[[\s\S]*\]/);
+    return m ? JSON.parse(m[0]) : raw;
+  }
+}
+
+async function runSimulation(sector, zone, count, maxRating) {
+  const prompt = `Tu es un système d'intelligence commerciale locale.
+
+Génère exactement ${count} fiches RÉALISTES de ${sector} à ${zone}.
+Chaque fiche représente un commerce local avec des données crédibles et variées.
+
+Critères de scoring A/B/C :
+- Score A : 2+ signaux → <15 avis, note <3.8, site absent/vieux (<2019), fiche non revendiquée, concurrent fort à 200m
+- Score B : 1 signal → 15-40 avis, site basique, note 3.8-4.2
+- Score C : 0 signal → >40 avis récents, bonne note, bien digitalisé
+
+Répartition cible : ~40% A, 35% B, 25% C.
+
+Réponds UNIQUEMENT avec un JSON valide (array de ${count} objets), sans markdown :
+[{"nom":"...","adresse":"...","telephone":"+33 X XX XX XX XX","site":"url ou null","note":3.4,"avis":11,"fiche_revendiquee":false,"concurrent":{"nom":"...","avis":240},"score":"A","signaux":["Peu d'avis (11 en 3 ans)","Pas de site web"],"angle":"Votre visibilité locale est quasi nulle face à vos concurrents proches"}]`;
+
+  const data = await callClaude({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] });
+  const text = data.content?.map(c => c.text || '').join('') || '';
+  try {
+    return JSON.parse(text.replace(/```json|```/g, '').trim());
+  } catch {
+    const m = text.match(/\[[\s\S]*\]/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error('Claude n\'a pas retourné de JSON valide. Réessaie.');
+  }
+}
+
+function renderResults(data, sector, zone) {
+  stopLoading();
+  const aCount = data.filter(d => d.score === 'A').length;
+  const bCount = data.filter(d => d.score === 'B').length;
+  const cCount = data.filter(d => d.score === 'C').length;
+
+  document.getElementById('results-panel').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val">${data.length}</div><div class="stat-lbl">Fiches analysées</div></div>
+      <div class="stat-card"><div class="stat-val green">${aCount}</div><div class="stat-lbl">Score A — Prioritaires</div></div>
+      <div class="stat-card"><div class="stat-val orange">${bCount}</div><div class="stat-lbl">Score B — À qualifier</div></div>
+      <div class="stat-card"><div class="stat-val red">${cCount}</div><div class="stat-lbl">Score C — Faible potentiel</div></div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-top">
+        <span class="table-top-title">${sector} — ${zone}</span>
+        <div class="table-actions">
+          <button class="btn-sm" onclick="exportCSV()">↓ CSV</button>
+          <button class="btn-sm primary" onclick="exportCSV(true)">↓ Export complet</button>
+        </div>
+      </div>
+      <div class="filter-row">
+        <button class="filter-btn all active" onclick="filterProspects('all',this)">Tous (${data.length})</button>
+        <button class="filter-btn fa" onclick="filterProspects('A',this)">Score A (${aCount})</button>
+        <button class="filter-btn fb" onclick="filterProspects('B',this)">Score B (${bCount})</button>
+        <button class="filter-btn fc" onclick="filterProspects('C',this)">Score C (${cCount})</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Score</th><th>Établissement</th><th>Note / Avis</th>
+            <th>Signaux détectés</th><th>Angle d'approche</th><th>Action</th>
+          </tr></thead>
+          <tbody id="prospects-tbody">${renderRows(data)}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderRows(data) {
+  const sorted = [...data].sort((a,b) => a.score.localeCompare(b.score));
+  return sorted.map((p, i) => `
+    <tr>
+      <td><span class="score-badge score-${p.score.toLowerCase()}">${p.score}</span></td>
+      <td>
+        <div class="biz-name">${escHtml(p.nom || '—')}</div>
+        <div class="biz-addr">${escHtml(p.adresse || '')}</div>
+        <div class="biz-tel">${escHtml(p.telephone || '')}</div>
+      </td>
+      <td>
+        <div style="font-weight:500;font-size:13px">${p.note ?? '—'}★</div>
+        <div style="color:var(--muted);font-size:11px">${p.avis ?? '?'} avis</div>
+      </td>
+      <td>${(p.signaux||[]).map(s=>`<span class="signal-tag">${escHtml(s)}</span>`).join('')}</td>
+      <td><div class="angle-text">${escHtml(p.angle || '—')}</div></td>
+      <td><button class="email-btn" onclick="openEmailModal(${i})">✉ Email</button></td>
+    </tr>`).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function filterProspects(score, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = score;
+  const filtered = score === 'all' ? allProspects : allProspects.filter(p => p.score === score);
+  document.getElementById('prospects-tbody').innerHTML = renderRows(filtered);
+}
+
+function exportCSV(full = false) {
+  const data = currentFilter === 'all' ? allProspects : allProspects.filter(p => p.score === currentFilter);
+  const cols = full
+    ? ['nom','adresse','telephone','site','note','avis','fiche_revendiquee','score','signaux','angle']
+    : ['nom','adresse','telephone','note','avis','score','signaux','angle'];
+  const esc = v => {
+    if (Array.isArray(v)) return '"' + v.join(', ') + '"';
+    if (v == null) return '';
+    return '"' + String(v).replace(/"/g,'""') + '"';
+  };
+  const csv = '\uFEFF' + [cols.join(';'), ...data.map(r => cols.map(c => esc(r[c])).join(';'))].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `scrapy_prospects_${Date.now()}.csv`;
+  a.click();
+}
+
+let _sortedForModal = [];
+function openEmailModal(idx) {
+  _sortedForModal = [...allProspects].sort((a,b) => a.score.localeCompare(b.score));
+  const filtered = currentFilter === 'all' ? _sortedForModal : _sortedForModal.filter(p => p.score === currentFilter);
+  const p = filtered[idx];
+  if (!p) return;
+
+  document.getElementById('modal-prospect-name').textContent = p.nom;
+  document.getElementById('modal-prospect-info').innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="score-badge score-${p.score.toLowerCase()}">${p.score}</span>
+      <div>
+        <div style="font-weight:500;font-size:13px">${escHtml(p.nom)}</div>
+        <div style="font-size:11px;color:var(--muted)">${p.note}★ · ${p.avis} avis${p.adresse?' · '+escHtml(p.adresse):''}</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:3px">${(p.signaux||[]).map(s=>`<span class="signal-tag">${escHtml(s)}</span>`).join('')}</div>`;
+  document.getElementById('modal-email-content').innerHTML = `<div class="modal-loading"><span class="modal-spinner">⚡</span>Génération en cours...</div>`;
+  document.getElementById('email-modal').classList.add('open');
+  generateEmail(p);
+}
+
+async function generateEmail(p) {
+  const prompt = `Tu es un expert en prospection commerciale locale.
+
+Rédige un email de prospection court et percutant pour ce prospect :
+- Établissement : ${p.nom}
+- Note Google : ${p.note}★ avec ${p.avis} avis
+- Signaux détectés : ${(p.signaux||[]).join(', ')}
+- Angle suggéré : ${p.angle}
+${p.concurrent ? `- Concurrent proche : ${p.concurrent.nom} avec ${p.concurrent.avis} avis` : ''}
+
+Règles :
+- 100-120 mots maximum
+- Ton direct, humain, pas corporatif
+- Commence par "Bonjour [Prénom],"
+- 1 seule question de clôture
+- Signe avec "[Ton prénom] — [Ton agence]"
+- Texte brut uniquement
+
+Retourne UNIQUEMENT l'email.`;
+
+  try {
+    const data = await callClaude({ model: 'claude-sonnet-4-20250514', max_tokens: 400, messages: [{ role: 'user', content: prompt }] });
+    const text = data.content?.map(c => c.text || '').join('') || 'Erreur.';
+    document.getElementById('modal-email-content').innerHTML = `
+      <div class="email-result" id="email-text">${escHtml(text)}</div>
+      <button class="copy-email-btn" onclick="copyEmail(this)">Copier l'email</button>`;
+  } catch(e) {
+    document.getElementById('modal-email-content').innerHTML = `<div style="color:var(--red);font-size:13px;padding:12px">Erreur : ${e.message}</div>`;
+  }
+}
+
+function copyEmail(btn) {
+  const text = document.getElementById('email-text')?.innerText || '';
+  navigator.clipboard.writeText(text);
+  btn.textContent = '✓ Copié !';
+  setTimeout(() => btn.textContent = 'Copier l\'email', 2000);
+}
+
+function closeModal() { document.getElementById('email-modal').classList.remove('open'); }
+document.getElementById('email-modal').addEventListener('click', e => { if (e.target.id === 'email-modal') closeModal(); });
+
+function showError(msg) {
+  stopLoading();
+  document.getElementById('results-panel').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">⚠️</div>
+      <div class="empty-title" style="color:var(--red)">Erreur</div>
+      <div class="empty-sub">${escHtml(msg)}</div>
+    </div>`;
+}
+</script>
+</body>
+</html>
